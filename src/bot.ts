@@ -129,9 +129,17 @@ async function getItem<T>(key: string): Promise<T | null> {
     const data = await s3Client.send(command);
     const body = await streamToString(data.Body!); // Convert stream to string
     return JSON.parse(body); // Assuming the value is stored as a JSON string
-  } catch (err) {
-    console.error("Error retrieving item:", err);
-    return null;
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "Code" in error &&
+      error?.Code === "NoSuchKey"
+    ) {
+      return null;
+    }
+
+    throw error;
   }
 }
 
@@ -173,39 +181,6 @@ bot.use(async (context, next) => {
   console.log("before context.session", context.session);
   await next();
   console.log("after context.session", context.session);
-});
-
-bot.start(async (context) => {
-  await context.reply(
-    "Привет, это 🧙‍♂️ Тайный Волхв. Заходи сюда и скорее участвуй в 🎄 рождественской игре, чтобы подарить тайный подарок твоему другу!!"
-  );
-
-  const game = await getItem<Game>("game");
-  const participants = (await getItem<Participants>("participants")) || {};
-  const participantsCount = Object.keys(participants).length;
-
-  if (game) {
-    await context.replyWithHTML(
-      `Игра <b>${game.name}</b> ID ${game.id} с стоимостью подарка <u>${game.giftCost} руб.</u>`
-    );
-
-    await context.reply(
-      `Для участия в игре нажми на кнопку "Присоединиться" к тайным волхвам (на данный момент участвуют ${participantsCount} волхвов)`,
-      {
-        ...Markup.inlineKeyboard([
-          Markup.button.callback(
-            // questionCancelButtonMessage,
-            "Присоединиться",
-            ActionId.Join
-          ),
-        ]),
-        disable_notification: true,
-      }
-    );
-  }
-
-  // // @ts-ignore
-  // context.session.__scenes = {};
 });
 
 // @ts-expect-error session type is compatible
@@ -285,8 +260,34 @@ joinGameWizard.use(async (context, next) => {
   }
 });
 
-bot.action(ActionId.Join, async (context) => {
-  await context.scene.enter(SceneId.JoinGame);
+bot.start(async (context) => {
+  await context.reply(
+    "Привет, это 🧙‍♂️ Тайный Волхв. Заходи сюда и скорее участвуй в 🎄 рождественской игре, чтобы подарить тайный подарок твоему другу!!"
+  );
+
+  const game = await getItem<Game>("game");
+  const participants = (await getItem<Participants>("participants")) || {};
+  const participantsCount = Object.keys(participants).length;
+
+  if (game) {
+    console.log("ActionId.Join sent");
+    await context.replyWithHTML(
+      `Игра <b>${game.name}</b> ID ${game.id} со стоимостью подарка <u>${game.giftCost} руб.</u>\n\nДля участия в игре нажми на кнопку "Присоединиться" к тайным волхвам (на данный момент участвуют ${participantsCount} волхвов)`,
+      {
+        ...Markup.inlineKeyboard([
+          Markup.button.callback(
+            // questionCancelButtonMessage,
+            "Присоединиться",
+            ActionId.Join
+          ),
+        ]),
+        disable_notification: true,
+      }
+    );
+  }
+
+  // // @ts-ignore
+  // context.session.__scenes = {};
 });
 
 // @ts-expect-error session type is compatible
@@ -366,9 +367,6 @@ createGameWizard.use(async (context, next) => {
   }
 });
 
-// @ts-expect-error session type is compatible
-const stage = new Stage<WizardContext>([createGameWizard, joinGameWizard]);
-
 // Disable bot in group chats
 bot.use(Composer.drop((context) => context.chat?.type !== "private"));
 
@@ -394,7 +392,14 @@ bot.use(async (context, next) => {
   }
 });
 
+// @ts-expect-error session type is compatible
+const stage = new Stage<WizardContext>([createGameWizard, joinGameWizard]);
 bot.use(stage.middleware());
+
+bot.action(ActionId.Join, async (context) => {
+  console.log("ActionId.Join handled");
+  await context.scene.enter(SceneId.JoinGame);
+});
 
 bot.command("create", async (context) => {
   // await context.reply(
