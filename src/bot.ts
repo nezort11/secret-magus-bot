@@ -493,18 +493,24 @@ bot.action(ActionId.StartRaffle, async (context) => {
   const leftWards = new Set(participantIds);
 
   for (const participantId of participantIds) {
-    const availableWards = new Set(...leftWards);
-    availableWards.delete(participantId); // remove self from available
+    const participant = participants[participantId];
 
-    const randomParticipantId =
-      Array.from(availableWards)[
-        Math.floor(Math.random() * availableWards.size)
-      ];
+    const availableWards = new Set(leftWards);
+    availableWards.delete(participantId); // you cant gift to yourself
+    if (participant.ward) {
+      availableWards.delete(participant.ward); // you cant gift to your magus
+    }
+    // console.log("availableWards", availableWards, availableWards.size);
+
+    const randomIndex = rand(0, availableWards.size - 1);
+    console.log("randomIndex", randomIndex);
+    const randomParticipantId = Array.from(availableWards)[randomIndex];
     leftWards.delete(randomParticipantId);
 
     participants[participantId].ward = randomParticipantId;
   }
 
+  console.log("participants", participants);
   const secretMaguses = [];
   for (const [participantId, participant] of Object.entries(
     participants
@@ -512,7 +518,7 @@ bot.action(ActionId.StartRaffle, async (context) => {
     const ward = participants[participant.ward!];
     await bot.telegram.sendMessage(
       participantId,
-      `Привет, была проведена жеребьевка, тебе полезлно и ты будешь дарить подарок <b>"${ward.participantName}"</b> 🎉, вот пожелание о 🎁 подарке:\n<i>${ward.participantGiftWish}</i>`,
+      `Привет, была проведена жеребьевка, тебе повезло и ты будешь дарить подарок <b>"${ward.participantName}"</b> 🎉, вот его/ее пожелание о 🎁 подарке:\n<i>${ward.participantGiftWish}</i>`,
       { parse_mode: "HTML" }
     );
 
