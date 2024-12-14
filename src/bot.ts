@@ -22,6 +22,14 @@ import { setTimeout } from "node:timers/promises";
 
 const uid = new ShortUniqueId({ length: 10 });
 
+// Fisher-Yates shuffle algorithm (Durstenfeld in-place version)
+function shuffleArray<T>(array: T[]) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
 const rand = (min: number, max: number) => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
@@ -490,24 +498,31 @@ bot.action(ActionId.StartRaffle, async (context) => {
 
   const participantIds = Object.keys(participants);
 
-  const leftWards = new Set(participantIds);
+  // const leftWards = new Set(participantIds);
+  // for (const participantId of participantIds) {
+  //   const participant = participants[participantId];
+  //   const availableWards = new Set(leftWards);
+  //   availableWards.delete(participantId); // you cant gift to yourself
+  //   if (participant.ward) {
+  //     availableWards.delete(participant.ward); // you cant gift to your magus
+  //   }
+  //   // console.log("availableWards", availableWards, availableWards.size);
+  //   const randomIndex = rand(0, availableWards.size - 1);
+  //   console.log("randomIndex", randomIndex);
+  //   const randomParticipantId = Array.from(availableWards)[randomIndex];
+  //   leftWards.delete(randomParticipantId);
+  // }
 
-  for (const participantId of participantIds) {
-    const participant = participants[participantId];
-
-    const availableWards = new Set(leftWards);
-    availableWards.delete(participantId); // you cant gift to yourself
-    if (participant.ward) {
-      availableWards.delete(participant.ward); // you cant gift to your magus
-    }
-    // console.log("availableWards", availableWards, availableWards.size);
-
-    const randomIndex = rand(0, availableWards.size - 1);
-    console.log("randomIndex", randomIndex);
-    const randomParticipantId = Array.from(availableWards)[randomIndex];
-    leftWards.delete(randomParticipantId);
-
-    participants[participantId].ward = randomParticipantId;
+  shuffleArray(participantIds);
+  for (
+    let participantIndex = 0;
+    participantIndex < participantIds.length;
+    participantIndex += 1
+  ) {
+    const participantId = participantIds[participantIndex];
+    const wardId =
+      participantIds[participantIndex + 1] ?? participantIds[0];
+    participants[participantId].ward = wardId;
   }
 
   console.log("participants", participants);
